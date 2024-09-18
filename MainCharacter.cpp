@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "DrawDebugHelpers.h"
+#include "Components/CapsuleComponent.h"
 
 // Sets default values
 AMainCharacter::AMainCharacter()
@@ -19,6 +20,16 @@ AMainCharacter::AMainCharacter()
 
 	BulletDistance = 100;
 
+	bIsCrouching = false;
+
+	CapsuleStandartHeight = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+	CapsuleHalfHeight = CapsuleStandartHeight * 0.5f;
+
+	NormalGroundFriction = 8.0f;
+	NormalBrakingDeceleration = 2048.0f;
+
+	SlideGroundFriction = 0.0f;
+	SlideBrakingDeceleration = 0.0f;
 }
 
 // Called when the game starts or when spawned
@@ -26,7 +37,12 @@ void AMainCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (MyAllWidgets)
+	GetCharacterMovement()->MaxWalkSpeed = FMath::Clamp(GetCharacterMovement()->MaxWalkSpeed, 600.0f, 900.0f);
+
+	GetCharacterMovement()->GroundFriction = NormalGroundFriction;
+	GetCharacterMovement()->BrakingDecelerationWalking = NormalBrakingDeceleration;
+
+	if (MyAllWidgets) // For Crosshair
 	{
 		CrosshairWidget = CreateWidget<UUserWidget>(GetWorld(), MyAllWidgets);
 
@@ -49,11 +65,15 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AMainCharacter::StartBHOP);
+	PlayerInputComponent->BindAction("Jump", IE_Repeat, this, &AMainCharacter::BHOPING);
+	PlayerInputComponent->BindAction("Jump", IE_Released, this, &AMainCharacter::StopBHOP);
+
 	PlayerInputComponent->BindAction("Fire", IE_Repeat, this, &AMainCharacter::Fire);
 
-	PlayerInputComponent->BindAction("Run", IE_Pressed, this, &AMainCharacter::StartRunning);
-	PlayerInputComponent->BindAction("Run", IE_Released, this, &AMainCharacter::StopRunning);
+	PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &AMainCharacter::StartSprint); // There is only IE_Pressed because I goaled to be controller simple and easy
+
+	PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &AMainCharacter::ToggleCrouch); // Same reason
 
 	PlayerInputComponent->BindAxis("MoveForward", this, &AMainCharacter::Forward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AMainCharacter::Right);
@@ -66,12 +86,71 @@ void AMainCharacter::Forward(float InputValue)
 {
 	FVector CharacterForward = GetActorForwardVector();
 	AddMovementInput(CharacterForward, InputValue);
+	if (InputValue == 0.0f && bIsSprinting) { StopSprint(); }
 }
 
 void AMainCharacter::Right(float InputValue)
 {
 	FVector CharacterRight = GetActorRightVector();
 	AddMovementInput(CharacterRight, InputValue);
+}
+
+void AMainCharacter::ToggleCrouch()
+{
+	bIsCrouching = !bIsCrouching;
+	GetWorldTimerManager().SetTimer(CrouchTimerHandle, this, &AMainCharacter::SmoothCrouch, 0.01f, true);
+
+	if (GetCharacterMovement()->MaxWalkSpeed >= 700.0f && bIsCrouching)
+	{
+		bIsSliding = true;
+		StartSlide();
+		GetWorldTimerManager().SetTimer(StartSlideTimerHandle, this, &AMainCharacter::StopSlide, 1.2f, false);
+	}
+}
+
+void AMainCharacter::SmoothCrouch()
+{
+	float TargetCapsuleHeightValue = bIsCrouching ? CapsuleHalfHeight : CapsuleStandartHeight;
+	float CurrentCapsuleHeightValue = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+
+	float NewHeightValue = FMath::Lerp(CurrentCapsuleHeightValue, TargetCapsuleHeightValue, 0.05f);
+	GetCapsuleComponent()->SetCapsuleHalfHeight(NewHeightValue);
+
+	if (FMath::Abs(CurrentCapsuleHeightValue - TargetCapsuleHeightValue) < 0.01f)
+	{
+		GetWorldTimerManager().ClearTimer(CrouchTimerHandle);
+	}
+}
+
+void AMainCharacter::StartSlide()
+{
+	SetPhysicsSettingsZero();
+	GetWorldTimerManager().SetTimer(SlideTimerHandle, this, &AMainCharacter::Sliding, 0.01f, true);
+}
+
+void AMainCharacter::Sliding()
+{
+	FVector CharacterForwardDirection = GetActorForwardVector();
+	AddMovementInput(CharacterForwardDirection, 3.0f);
+}
+
+void AMainCharacter::StopSlide()
+{
+	SetPhysicsSettingsNormal();
+	GetWorldTimerManager().ClearTimer(SlideTimerHandle);
+	bIsSliding = false;
+}
+
+void AMainCharacter::SetPhysicsSettingsZero()
+{
+	GetCharacterMovement()->GroundFriction = SlideGroundFriction;
+	GetCharacterMovement()->BrakingDecelerationWalking = SlideBrakingDeceleration;
+}
+
+void AMainCharacter::SetPhysicsSettingsNormal()
+{
+	GetCharacterMovement()->GroundFriction = NormalGroundFriction;
+	GetCharacterMovement()->BrakingDecelerationWalking = NormalBrakingDeceleration;
 }
 
 void AMainCharacter::MouseX(float InputValue)
@@ -83,6 +162,7 @@ void AMainCharacter::MouseY(float InputValue)
 {
 	AddControllerPitchInput(InputValue);
 }
+
 void AMainCharacter::Fire()
 {
 	FCollisionQueryParams TraceParams;
@@ -93,22 +173,47 @@ void AMainCharacter::Fire()
 	FVector StartFVector = Camera->GetComponentLocation();
 	FVector EndFVector = StartFVector + Camera->GetForwardVector() * BulletDistance * 50;
 
-	if (World->LineTraceSingleByChannel(HitInfo, StartFVector, EndFVector, ECC_WorldStatic, TraceParams))
+	/*if (World->LineTraceSingleByChannel(HitInfo, StartFVector, EndFVector, ECC_WorldStatic, TraceParams))
 	{
-		DrawDebugLine(GetWorld(), StartFVector, EndFVector, FColor::Red, false, 1.0f, 0, 5.0f);
+
 	}
 	else
 	{
-		DrawDebugLine(GetWorld(), StartFVector, EndFVector, FColor::Green, false, 1.0f, 0, 5.0f);
+
+	}*/
+}
+
+void AMainCharacter::StartSprint()
+{
+	if (!bIsCrouching || !bIsJumping)
+	{
+		GetCharacterMovement()->MaxWalkSpeed = 1000.0f;
+		bIsSprinting = true;
 	}
 }
 
-void AMainCharacter::StartRunning()
-{
-	GetCharacterMovement()->MaxWalkSpeed = 1000.0f;
-}
-
-void AMainCharacter::StopRunning()
+void AMainCharacter::StopSprint()
 {
 	GetCharacterMovement()->MaxWalkSpeed = 600.0f;
+	bIsSprinting = false;
+}
+
+void AMainCharacter::StartBHOP()
+{
+	bIsJumping = true;
+	SetPhysicsSettingsZero();
+	GetWorldTimerManager().SetTimer(JumpTimerHandle, this, &ACharacter::Jump, 0.1f, true);
+}
+
+void AMainCharacter::BHOPING()
+{
+	GetCharacterMovement()->MaxWalkSpeed += 10.0f;
+}
+
+void AMainCharacter::StopBHOP()
+{
+	bIsJumping = false;
+	SetPhysicsSettingsNormal();
+	GetCharacterMovement()->MaxWalkSpeed = 600.0f;
+	GetWorldTimerManager().ClearTimer(JumpTimerHandle);
 }
