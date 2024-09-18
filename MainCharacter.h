@@ -39,14 +39,47 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	int BulletDistance;
 
+	FTimerHandle CrouchTimerHandle;
+	FTimerHandle SlideTimerHandle;
+	FTimerHandle StartSlideTimerHandle;
+	FTimerHandle JumpTimerHandle;
+
 	void Forward(float InputValue);
 	void Right(float InputValue);
+
+	void ToggleCrouch();
+
+	void SmoothCrouch();
+
+	void StartSprint();
+	void StopSprint();
+
+	void StartSlide();
+	void Sliding();
+	void StopSlide();
+
+	void SetPhysicsSettingsZero();
+	void SetPhysicsSettingsNormal();
+
+	void StartBHOP();
+	void BHOPING();
+	void StopBHOP();
+
+	bool bIsSprinting;
+	bool bIsCrouching;
+	bool bIsSliding;
+	bool bIsJumping;
+
+	float CapsuleHalfHeight;
+	float CapsuleStandartHeight;
+
+	float NormalGroundFriction;
+	float SlideGroundFriction;
+	float NormalBrakingDeceleration;
+	float SlideBrakingDeceleration;
 
 	void MouseX(float InputValue);
 	void MouseY(float InputValue);
 
 	void Fire();
-
-	void StartRunning();
-	void StopRunning();
 };
