@@ -37,7 +37,7 @@ void AMainCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	GetCharacterMovement()->MaxWalkSpeed = FMath::Clamp(GetCharacterMovement()->MaxWalkSpeed, 600.0f, 900.0f);
+	GetCharacterMovement()->MaxWalkSpeed = FMath::Clamp(GetCharacterMovement()->MaxWalkSpeed, 600.0f, 1000.0f);
 
 	GetCharacterMovement()->GroundFriction = NormalGroundFriction;
 	GetCharacterMovement()->BrakingDecelerationWalking = NormalBrakingDeceleration;
@@ -125,13 +125,36 @@ void AMainCharacter::SmoothCrouch()
 void AMainCharacter::StartSlide()
 {
 	SetPhysicsSettingsZero();
+
+	FCollisionQueryParams TraceParams;
+	TraceParams.AddIgnoredActor(this);
+	FHitResult HitInfo;
+	/*
+	FVector StartFVector =
+	FVector EndFVector =
+	if (GetWorld()->LineTraceSingleByChannel(HitInfo, StartFVector, EndFVector, ECC_WorldStatic, TraceParams))
+	{
+
+	}
+	else
+	{
+
+	}
+
+	*/
+
+
 	GetWorldTimerManager().SetTimer(SlideTimerHandle, this, &AMainCharacter::Sliding, 0.01f, true);
 }
 
 void AMainCharacter::Sliding()
 {
-	FVector CharacterForwardDirection = GetActorForwardVector();
-	AddMovementInput(CharacterForwardDirection, 3.0f);
+	if (GetInputAxisValue("MoveForward") >= 0.0f)
+	{
+		FVector CharacterForwardDirection = GetActorForwardVector();
+		AddMovementInput(CharacterForwardDirection, 1.0f);
+	}
+	else { StopSlide(); }
 }
 
 void AMainCharacter::StopSlide()
@@ -185,7 +208,7 @@ void AMainCharacter::Fire()
 
 void AMainCharacter::StartSprint()
 {
-	if (!bIsCrouching || !bIsJumping)
+	if (!(bIsCrouching || bIsJumping))
 	{
 		GetCharacterMovement()->MaxWalkSpeed = 1000.0f;
 		bIsSprinting = true;
