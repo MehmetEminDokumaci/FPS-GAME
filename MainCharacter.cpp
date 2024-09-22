@@ -37,7 +37,7 @@ void AMainCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	GetCharacterMovement()->MaxWalkSpeed = FMath::Clamp(GetCharacterMovement()->MaxWalkSpeed, 600.0f, 1000.0f);
+	GetCharacterMovement()->MaxWalkSpeed = FMath::Clamp(GetCharacterMovement()->MaxWalkSpeed, 600.0f, 900.0f);
 
 	GetCharacterMovement()->GroundFriction = NormalGroundFriction;
 	GetCharacterMovement()->BrakingDecelerationWalking = NormalBrakingDeceleration;
@@ -142,8 +142,6 @@ void AMainCharacter::StartSlide()
 	}
 
 	*/
-
-
 	GetWorldTimerManager().SetTimer(SlideTimerHandle, this, &AMainCharacter::Sliding, 0.01f, true);
 }
 
@@ -210,7 +208,7 @@ void AMainCharacter::StartSprint()
 {
 	if (!(bIsCrouching || bIsJumping))
 	{
-		GetCharacterMovement()->MaxWalkSpeed = 1000.0f;
+		GetCharacterMovement()->MaxWalkSpeed = 850.0f;
 		bIsSprinting = true;
 	}
 }
@@ -223,9 +221,9 @@ void AMainCharacter::StopSprint()
 
 void AMainCharacter::StartBHOP()
 {
+	GetWorldTimerManager().SetTimer(JumpTimerHandle, this, &ACharacter::Jump, 0.1f, true);
 	bIsJumping = true;
 	SetPhysicsSettingsZero();
-	GetWorldTimerManager().SetTimer(JumpTimerHandle, this, &ACharacter::Jump, 0.1f, true);
 }
 
 void AMainCharacter::BHOPING()
@@ -235,8 +233,8 @@ void AMainCharacter::BHOPING()
 
 void AMainCharacter::StopBHOP()
 {
+	GetWorldTimerManager().ClearTimer(JumpTimerHandle);
 	bIsJumping = false;
 	SetPhysicsSettingsNormal();
 	GetCharacterMovement()->MaxWalkSpeed = 600.0f;
-	GetWorldTimerManager().ClearTimer(JumpTimerHandle);
 }
