@@ -129,19 +129,7 @@ void AMainCharacter::StartSlide()
 	FCollisionQueryParams TraceParams;
 	TraceParams.AddIgnoredActor(this);
 	FHitResult HitInfo;
-	/*
-	FVector StartFVector =
-	FVector EndFVector =
-	if (GetWorld()->LineTraceSingleByChannel(HitInfo, StartFVector, EndFVector, ECC_WorldStatic, TraceParams))
-	{
 
-	}
-	else
-	{
-
-	}
-
-	*/
 	GetWorldTimerManager().SetTimer(SlideTimerHandle, this, &AMainCharacter::Sliding, 0.01f, true);
 }
 
