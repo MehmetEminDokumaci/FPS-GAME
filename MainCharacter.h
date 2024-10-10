@@ -28,8 +28,11 @@ public:
 
 protected:
 
-	UPROPERTY(EditAnywhere, Category = "Object")
+	UPROPERTY(EditAnywhere, Category = "Camera Objects")
 	class UCameraComponent* Camera;
+
+	UPROPERTY(EditAnywhere, Category = "Camera Objects")
+	class UStaticMeshComponent* StartShootLocation;
 
 	UPROPERTY(EditAnywhere, Category = "UI")
 	TSubclassOf<UUserWidget> MyAllWidgets;
@@ -43,6 +46,9 @@ protected:
 	FTimerHandle SlideTimerHandle;
 	FTimerHandle StartSlideTimerHandle;
 	FTimerHandle JumpTimerHandle;
+
+	FHitResult HitInfo;
+	FCollisionQueryParams TraceParams;
 
 	void Forward(float InputValue);
 	void Right(float InputValue);
