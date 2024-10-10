@@ -180,7 +180,6 @@ void AMainCharacter::Fire()
 
 	if (this->GetWorld()->LineTraceSingleByChannel(HitInfo, StartLocation, EndLocation , ECC_Visibility, TraceParams))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Bir şey vurdun"));
 		DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Green, false, 5.0f, 0, 1.0f);
 	}
 	else
