@@ -18,7 +18,10 @@ AMainCharacter::AMainCharacter()
 	Camera->SetupAttachment(RootComponent);
 	Camera->bUsePawnControlRotation = true;
 
-	BulletDistance = 100;
+	StartShootLocation = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Start Location"));
+	StartShootLocation->SetupAttachment(Camera);
+
+	BulletDistance = 5000;
 
 	bIsCrouching = false;
 
@@ -30,6 +33,9 @@ AMainCharacter::AMainCharacter()
 
 	SlideGroundFriction = 0.0f;
 	SlideBrakingDeceleration = 0.0f;
+
+	TraceParams.AddIgnoredActor(this);
+
 }
 
 // Called when the game starts or when spawned
@@ -37,7 +43,7 @@ void AMainCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	GetCharacterMovement()->MaxWalkSpeed = FMath::Clamp(GetCharacterMovement()->MaxWalkSpeed, 600.0f, 900.0f);
+	GetCharacterMovement()->MaxWalkSpeed = FMath::Clamp(GetCharacterMovement()->MaxWalkSpeed, 600.0f, 1000.0f);
 
 	GetCharacterMovement()->GroundFriction = NormalGroundFriction;
 	GetCharacterMovement()->BrakingDecelerationWalking = NormalBrakingDeceleration;
@@ -69,7 +75,7 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAction("Jump", IE_Repeat, this, &AMainCharacter::BHOPING);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &AMainCharacter::StopBHOP);
 
-	PlayerInputComponent->BindAction("Fire", IE_Repeat, this, &AMainCharacter::Fire);
+	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AMainCharacter::Fire);
 
 	PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &AMainCharacter::StartSprint); // There is only IE_Pressed because I goaled to be controller simple and easy
 
@@ -125,11 +131,6 @@ void AMainCharacter::SmoothCrouch()
 void AMainCharacter::StartSlide()
 {
 	SetPhysicsSettingsZero();
-
-	FCollisionQueryParams TraceParams;
-	TraceParams.AddIgnoredActor(this);
-	FHitResult HitInfo;
-
 	GetWorldTimerManager().SetTimer(SlideTimerHandle, this, &AMainCharacter::Sliding, 0.01f, true);
 }
 
@@ -174,29 +175,25 @@ void AMainCharacter::MouseY(float InputValue)
 
 void AMainCharacter::Fire()
 {
-	FCollisionQueryParams TraceParams;
-	TraceParams.AddIgnoredActor(this);
+	FVector StartLocation = StartShootLocation->GetComponentLocation();
+	FVector EndLocation = StartLocation + StartShootLocation->GetForwardVector() * BulletDistance;
 
-	FHitResult HitInfo;
-	UWorld* World = this->GetWorld();
-	FVector StartFVector = Camera->GetComponentLocation();
-	FVector EndFVector = StartFVector + Camera->GetForwardVector() * BulletDistance * 50;
-
-	/*if (World->LineTraceSingleByChannel(HitInfo, StartFVector, EndFVector, ECC_WorldStatic, TraceParams))
+	if (this->GetWorld()->LineTraceSingleByChannel(HitInfo, StartLocation, EndLocation , ECC_Visibility, TraceParams))
 	{
-
+		UE_LOG(LogTemp, Warning, TEXT("Bir şey vurdun"));
+		DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Green, false, 5.0f, 0, 1.0f);
 	}
 	else
 	{
-
-	}*/
+		DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Red, false, 5.0f, 0, 1.0f);
+	}
 }
 
 void AMainCharacter::StartSprint()
 {
 	if (!(bIsCrouching || bIsJumping))
 	{
-		GetCharacterMovement()->MaxWalkSpeed = 850.0f;
+		GetCharacterMovement()->MaxWalkSpeed = 950.0f;
 		bIsSprinting = true;
 	}
 }
@@ -216,7 +213,7 @@ void AMainCharacter::StartBHOP()
 
 void AMainCharacter::BHOPING()
 {
-	GetCharacterMovement()->MaxWalkSpeed += 10.0f;
+	GetCharacterMovement()->MaxWalkSpeed += 5.0f;
 }
 
 void AMainCharacter::StopBHOP()
